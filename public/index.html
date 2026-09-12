@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Email Domain Inspector</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0d1117; color: #e6edf3; font-family: 'Segoe UI', sans-serif; min-height: 100vh; padding: 40px 20px; }
+    h1 { text-align: center; font-size: 1.6rem; color: #58a6ff; margin-bottom: 8px; letter-spacing: 1px; }
+    .subtitle { text-align: center; color: #8b949e; font-size: 0.85rem; margin-bottom: 30px; }
+    .search-box { display: flex; gap: 10px; max-width: 700px; margin: 0 auto 30px; }
+    input { flex: 1; padding: 12px 16px; background: #161b22; border: 1px solid #30363d; border-radius: 8px; color: #e6edf3; font-size: 1rem; outline: none; transition: border-color 0.2s; }
+    input:focus { border-color: #58a6ff; }
+    button { padding: 12px 24px; background: #238636; border: none; border-radius: 8px; color: #fff; font-size: 1rem; cursor: pointer; transition: background 0.2s; }
+    button:hover { background: #2ea043; }
+    button:disabled { background: #3d4451; cursor: not-allowed; }
+    .spinner { text-align: center; color: #8b949e; font-size: 0.9rem; padding: 40px; }
+    .results { max-width: 700px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+    .card { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 20px; }
+    .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+    .card-title { font-weight: 700; font-size: 1rem; color: #58a6ff; }
+    .pass { color: #56d364; font-weight: 700; }
+    .fail { color: #f85149; font-weight: 700; }
+    .warn { color: #e3b341; font-weight: 700; }
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .info-row { display: flex; flex-direction: column; background: #21262d; border-radius: 6px; padding: 8px 12px; }
+    .info-label { font-size: 0.7rem; color: #8b949e; text-transform: uppercase; margin-bottom: 2px; }
+    .info-value { font-size: 0.88rem; color: #e6edf3; word-break: break-all; }
+    .full-width { grid-column: 1 / -1; }
+    .record-box { background: #21262d; border-radius: 6px; padding: 10px 12px; font-size: 0.78rem; color: #8b949e; word-break: break-all; font-family: monospace; margin-top: 10px; }
+    .mx-list { display: flex; flex-direction: column; gap: 6px; }
+    .mx-item { background: #21262d; border-radius: 6px; padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; }
+    .mx-host { font-size: 0.9rem; }
+    .mx-priority { font-size: 0.75rem; color: #8b949e; background: #161b22; padding: 2px 8px; border-radius: 10px; }
+    .dkim-found { display: flex; flex-direction: column; gap: 8px; }
+    .dkim-item { background: #21262d; border-radius: 6px; padding: 10px 12px; }
+    .dkim-selector { font-size: 0.78rem; color: #58a6ff; font-weight: 700; margin-bottom: 4px; }
+    .dkim-record { font-size: 0.72rem; color: #8b949e; font-family: monospace; word-break: break-all; }
+    .rbl-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; }
+    .rbl-item { background: #21262d; border-radius: 6px; padding: 8px 10px; display: flex; justify-content: space-between; align-items: center; }
+    .rbl-name { font-size: 0.78rem; color: #8b949e; }
+    .rbl-listed { font-size: 0.75rem; font-weight: 700; color: #f85149; }
+    .rbl-clean { font-size: 0.75rem; color: #56d364; }
+    .summary-bar { display: flex; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+    .summary-pill { padding: 4px 12px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; }
+    .pill-pass { background: #1a3a2a; color: #56d364; }
+    .pill-fail { background: #3a1a1a; color: #f85149; }
+    .pill-warn { background: #3a2d1a; color: #e3b341; }
+    .not-found { color: #8b949e; font-size: 0.88rem; font-style: italic; }
+    .meta { font-size: 0.78rem; color: #8b949e; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <h1>📧 Email Domain Inspector</h1>
+  <p class="subtitle">Enter a domain (e.g. gmail.com) or mail server IP</p>
+
+  <div class="search-box">
+    <input type="text" id="target" placeholder="e.g. gmail.com or 74.125.141.27" />
+    <button id="inspectBtn" onclick="inspect()">Inspect</button>
+  </div>
+
+  <div id="results"></div>
+
+  <script>
+    document.getElementById('target').addEventListener('keydown', e => {
+      if (e.key === 'Enter') inspect();
+    });
+
+    async function inspect() {
+      const target = document.getElementById('target').value.trim();
+      if (!target) return;
+      const btn = document.getElementById('inspectBtn');
+      const results = document.getElementById('results');
+      btn.disabled = true;
+      results.innerHTML = '<div class="spinner">⏳ Inspecting email infrastructure...</div>';
+
+      try {
+        const res = await fetch('/inspect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ target })
+        });
+        const data = await res.json();
+        renderResults(data);
+      } catch (err) {
+        results.innerHTML = `<div class="card" style="color:#f85149">Error: ${err.message}</div>`;
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    function renderResults(data) {
+      const { results, domain, ip, isIP } = data;
+      let html = '<div class="results">';
+
+      // Summary bar
+      if (!isIP) {
+        html += renderSummary(results);
+        html += renderMX(results.mx);
+        html += renderSPF(results.spf);
+        html += renderDMARC(results.dmarc);
+        html += renderDKIM(results.dkim);
+        html += renderBIMI(results.bimi);
+      }
+
+        if (results.mtasts) html += renderMTASTS(results.mtasts);
+      if (results.tlsrpt) html += renderTLSRPT(results.tlsrpt);
+      if (results.rbl) html += renderRBL(results.rbl, ip);
+
+      html += '</div>';
+      document.getElementById('results').innerHTML = html;
+    }
+
+    function renderSummary(results) {
+      const pills = [];
+      if (results.spf?.success) pills.push(`<span class="summary-pill pill-pass">✅ SPF</span>`);
+      else pills.push(`<span class="summary-pill pill-fail">❌ SPF</span>`);
+      if (results.dmarc?.success) {
+        const p = results.dmarc.policy;
+        const cls = p === 'reject' ? 'pill-pass' : p === 'quarantine' ? 'pill-warn' : 'pill-fail';
+        pills.push(`<span class="summary-pill ${cls}">DMARC: ${p}</span>`);
+      } else pills.push(`<span class="summary-pill pill-fail">❌ DMARC</span>`);
+      if (results.dkim?.success) pills.push(`<span class="summary-pill pill-pass">✅ DKIM</span>`);
+      else pills.push(`<span class="summary-pill pill-fail">❌ DKIM</span>`);
+      if (results.bimi?.success) pills.push(`<span class="summary-pill pill-pass">✅ BIMI</span>`);
+        if (results.mtasts?.success) {
+        const cls = results.mtasts.mode === 'enforce' ? 'pill-pass' : 'pill-warn';
+        pills.push(`<span class="summary-pill ${cls}">MTA-STS: ${results.mtasts.mode}</span>`);
+      } else if (results.mtasts) {
+        pills.push(`<span class="summary-pill pill-fail">❌ MTA-STS</span>`);
+      }
+      const listed = results.rbl?.filter(r => r.listed).length || 0;
+      if (listed > 0) pills.push(`<span class="summary-pill pill-fail">⛔ ${listed} RBL Hit${listed > 1 ? 's' : ''}</span>`);
+      else if (results.rbl) pills.push(`<span class="summary-pill pill-pass">✅ Not Blacklisted</span>`);
+
+      return `<div class="card"><div class="card-title" style="margin-bottom:12px">Summary</div><div class="summary-bar">${pills.join('')}</div></div>`;
+    }
+
+    function renderMX(mx) {
+      if (!mx) return '';
+      const header = `<div class="card-header"><span class="card-title">MX Records</span>${mx.success ? `<span class="pass">${mx.records.length} record${mx.records.length !== 1 ? 's' : ''}</span>` : '<span class="fail">Not found</span>'}</div>`;
+      if (!mx.success) return `<div class="card">${header}<p class="not-found">${mx.error}</p></div>`;
+      const list = mx.records.map(r => `<div class="mx-item"><span class="mx-host">${r.exchange}</span><span class="mx-priority">Priority ${r.priority}</span></div>`).join('');
+      return `<div class="card">${header}<div class="mx-list">${list}</div></div>`;
+    }
+
+    function renderSPF(spf) {
+      if (!spf) return '';
+      const status = spf.success ? (spf.policy?.includes('dangerous') ? '<span class="fail">⛔ Dangerous</span>' : spf.policy?.includes('hard fail') ? '<span class="pass">✅ Hard Fail</span>' : spf.policy?.includes('SoftFail') ? '<span class="warn">⚠️ SoftFail</span>' : '<span class="warn">⚠️ Neutral</span>') : '<span class="fail">❌ Missing</span>';
+      const header = `<div class="card-header"><span class="card-title">SPF</span>${status}</div>`;
+      if (!spf.success) return `<div class="card">${header}<p class="not-found">${spf.error}</p></div>`;
+      return `<div class="card">${header}<div class="info-row full-width" style="background:#21262d;border-radius:6px;padding:8px 12px;"><span class="info-label">Policy</span><span class="info-value">${spf.policy}</span></div><div class="record-box">${spf.record}</div></div>`;
+    }
+
+    function renderDMARC(dmarc) {
+      if (!dmarc) return '';
+      const pClass = dmarc.policy === 'reject' ? 'pass' : dmarc.policy === 'quarantine' ? 'warn' : 'fail';
+      const header = `<div class="card-header"><span class="card-title">DMARC</span>${dmarc.success ? `<span class="${pClass}">${dmarc.policy?.toUpperCase()}</span>` : '<span class="fail">❌ Missing</span>'}</div>`;
+      if (!dmarc.success) return `<div class="card">${header}<p class="not-found">${dmarc.error}</p></div>`;
+      const fields = [
+        ['Policy', dmarc.policyLabel],
+        ['Subdomain Policy', dmarc.subPolicy || 'Inherits p='],
+        ['Coverage', `${dmarc.pct}% of mail`],
+        ['DKIM Alignment', dmarc.adkim],
+        ['SPF Alignment', dmarc.aspf],
+        ['Aggregate Reports (rua)', dmarc.rua || 'Not set'],
+        ['Forensic Reports (ruf)', dmarc.ruf || 'Not set'],
+      ];
+      const grid = fields.map(([l, v]) => `<div class="info-row"><span class="info-label">${l}</span><span class="info-value">${v}</span></div>`).join('');
+      return `<div class="card">${header}<div class="info-grid">${grid}</div><div class="record-box">${dmarc.record}</div></div>`;
+    }
+
+    function renderDKIM(dkim) {
+      if (!dkim) return '';
+      const header = `<div class="card-header"><span class="card-title">DKIM</span>${dkim.success ? `<span class="pass">✅ ${dkim.found.length} selector${dkim.found.length !== 1 ? 's' : ''} found</span>` : '<span class="fail">❌ None found</span>'}</div>`;
+      let body = '';
+      if (dkim.success) {
+        body = `<div class="dkim-found">${dkim.found.map(d => `<div class="dkim-item"><div class="dkim-selector">Selector: ${d.selector}</div><div class="dkim-record">${d.record}</div></div>`).join('')}</div>`;
+      } else {
+        body = `<p class="not-found">Tried ${dkim.tried} common selectors — none matched. DKIM may use a custom selector.</p>`;
+      }
+      return `<div class="card">${header}${body}</div>`;
+    }
+
+    function renderBIMI(bimi) {
+  if (!bimi) return '';
+  const header = `<div class="card-header"><span class="card-title">BIMI</span>${bimi.success ? '<span class="pass">✅ Present</span>' : '<span class="not-found">Not configured</span>'}</div>`;
+  if (!bimi.success) return `<div class="card">${header}<p class="not-found">${bimi.error}</p></div>`;
+  const fields = [
+    ['Logo URL', bimi.logoURL || 'Not set'],
+    ['Authority URL (VMC)', bimi.authorityURL || 'Not set']
+  ];
+  const grid = fields.map(([l, v]) => `<div class="info-row full-width"><span class="info-label">${l}</span><span class="info-value">${v}</span></div>`).join('');
+  const logo = bimi.logoURL ? `<div style="margin-top:14px;text-align:center;"><img src="${bimi.logoURL}" alt="BIMI Logo" style="max-height:80px;max-width:200px;background:#fff;padding:8px;border-radius:8px;" onerror="this.style.display='none'" /></div>` : '';
+  return `<div class="card">${header}<div class="info-grid">${grid}</div>${logo}<div class="record-box">${bimi.record}</div></div>`;
+}
+
+function renderMTASTS(mtasts) {
+  if (!mtasts) return '';
+  const header = `<div class="card-header"><span class="card-title">MTA-STS</span>${mtasts.success ? `<span class="pass">✅ ${mtasts.mode?.toUpperCase() || 'Present'}</span>` : '<span class="fail">❌ Not configured</span>'}</div>`;
+  if (!mtasts.success) return `<div class="card">${header}<p class="not-found">${mtasts.error}</p></div>`;
+
+  let modeLabel = '';
+  if (mtasts.mode === 'enforce') modeLabel = 'Enforce — TLS required, unauthenticated mail rejected';
+  else if (mtasts.mode === 'testing') modeLabel = 'Testing — failures reported but mail still delivered';
+  else if (mtasts.mode === 'none') modeLabel = 'None — policy disabled';
+
+  const fields = [
+    ['Mode', modeLabel || mtasts.mode],
+    ['Policy ID', mtasts.id],
+    ['Max Age', mtasts.maxAge ? `${parseInt(mtasts.maxAge).toLocaleString()} seconds` : null],
+    ['Policy File', mtasts.policyFetched ? 'Fetched successfully' : 'Could not retrieve'],
+  ].filter(([, v]) => v);
+
+  const grid = fields.map(([l, v]) => `<div class="info-row"><span class="info-label">${l}</span><span class="info-value">${v}</span></div>`).join('');
+  const mxList = mtasts.mx?.length ? `<div style="margin-top:10px"><div class="info-label" style="margin-bottom:6px">Allowed MX Hosts</div><div class="mx-list">${mtasts.mx.map(m => `<div class="mx-item"><span class="mx-host">${m}</span></div>`).join('')}</div></div>` : '';
+
+  return `<div class="card">${header}<div class="info-grid">${grid}</div>${mxList}<div class="record-box">${mtasts.dnsRecord}</div></div>`;
+}
+
+function renderTLSRPT(tlsrpt) {
+  if (!tlsrpt) return '';
+  const header = `<div class="card-header"><span class="card-title">TLS-RPT</span>${tlsrpt.success ? '<span class="pass">✅ Configured</span>' : '<span class="not-found">Not configured</span>'}</div>`;
+  if (!tlsrpt.success) return `<div class="card">${header}<p class="not-found">${tlsrpt.error}</p></div>`;
+  return `<div class="card">${header}<div class="info-grid"><div class="info-row full-width"><span class="info-label">Report Destination (rua)</span><span class="info-value">${tlsrpt.rua || 'Not set'}</span></div></div><div class="record-box">${tlsrpt.record}</div></div>`;
+}
+
+    function renderRBL(rbl, ip) {
+      const listed = rbl.filter(r => r.listed);
+      const header = `<div class="card-header"><span class="card-title">Blacklist Check${ip ? ` — ${ip}` : ''}</span>${listed.length > 0 ? `<span class="fail">⛔ ${listed.length} listed</span>` : '<span class="pass">✅ Clean</span>'}</div>`;
+      const grid = rbl.map(r => `<div class="rbl-item"><span class="rbl-name">${r.rbl}</span>${r.listed ? '<span class="rbl-listed">LISTED</span>' : '<span class="rbl-clean">Clean</span>'}</div>`).join('');
+      return `<div class="card">${header}<div class="rbl-grid">${grid}</div></div>`;
+    }
+  </script>
+</body>
+</html>
