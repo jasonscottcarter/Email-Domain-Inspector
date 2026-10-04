@@ -13,7 +13,8 @@ const DKIM_SELECTORS = [
   'default', 'dkim', 'mail', 'email',
   'k1', 'k2', 'k3',
   's1', 's2',
-  'smtp', 'mimecast', 'proofpoint'
+  'smtp', 'mimecast',
+  'proofpoint', 'pps1'        // Proofpoint (pps1 is the default Proofpoint Professional Services sets up)
 ];
 
 // Major RBLs to check
