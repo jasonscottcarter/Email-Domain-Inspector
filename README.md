@@ -102,4 +102,4 @@ Node.js, Express, Node's built-in `dns` and `https` modules, and vanilla JavaScr
 
 ## License
 
-MIT. See `LICENSE`.
+MIT. See [LICENSE](LICENSE).
