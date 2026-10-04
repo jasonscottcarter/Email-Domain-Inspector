@@ -31,13 +31,13 @@ Everything uses DNS queries and Node's built-in `https` module. Express is the o
 ## Installation
 
 ```bash
-git clone https://github.com/jasonscottcarter/email-inspector.git
-cd email-inspector
+git clone https://github.com/jasonscottcarter/Email-Domain-Inspector.git
+cd Email-Domain-Inspector
 npm install
 node server.js
 ```
 
-You should see `Email Inspector running at http://localhost:3000`. Open that address in your browser. Press `Ctrl+C` in the terminal to stop the server.
+You should see `Email Domain Inspector running at http://localhost:3000`. Open that address in your browser. Press `Ctrl+C` in the terminal to stop the server.
 
 ## Usage
 
@@ -64,7 +64,7 @@ Enter a bare domain (for example `gmail.com`) or an IPv4 address (for example `7
 ## Project structure
 
 ```
-email-inspector/
+Email-Domain-Inspector/
 ├── public/
 │   └── index.html     # Frontend dashboard
 ├── .gitignore
@@ -91,7 +91,7 @@ email-inspector/
 | Problem | Fix |
 | --- | --- |
 | `node: command not found` | Node.js isn't installed or isn't on your PATH. Reinstall it and open a new terminal. |
-| `Cannot find module 'express'` | Run `npm install` from inside the `email-inspector` folder. |
+| `Cannot find module 'express'` | Run `npm install` from inside the `Email-Domain-Inspector` folder. |
 | Port 3000 already in use | Change `3000` to `3001` at the bottom of `server.js`, restart, and open `http://localhost:3001`. |
 | Every blocklist shows "not listed" | Your network or resolver may be blocking queries to blocklist zones. Try a different network or DNS server. |
 | MTA-STS policy not fetched | The domain has an MTA-STS DNS record but its policy file at `https://mta-sts.<domain>/.well-known/mta-sts.txt` is unreachable. This is a configuration issue on the domain owner's side. |
